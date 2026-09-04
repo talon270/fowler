@@ -1,0 +1,18 @@
+# Upstream source dumps — ~3.4 GB, all re-downloadable.
+# build/sources/README.md has the URL for every one of them.
+build/sources/*
+!build/sources/README.md
+!build/sources/awl.json
+!build/sources/roots.json
+
+# Timestamped backups taken before large edits to fowler.html — local safety
+# net, not history. Git is the history once this is a repo.
+fowler.backup-*.html
+
+build/.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+
+# Open English WordNet cache lives outside the repo (~/.wn_data), not here.

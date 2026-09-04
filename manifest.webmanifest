@@ -1,0 +1,17 @@
+{
+  "name": "Fowler — vocabulary for academic writing and exam verbal",
+  "short_name": "Fowler",
+  "description": "Near-synonym discrimination for essay prose and GRE/CAT verbal, drawn from real Wiktionary quotations. Offline, no account, no telemetry.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#faf8f5",
+  "theme_color": "#faf8f5",
+  "lang": "en",
+  "categories": ["education", "reference"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
