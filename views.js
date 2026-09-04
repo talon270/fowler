@@ -48,6 +48,58 @@
     return UI.el("span", { class: "tag", text: tags[0] });
   }
 
+  const FLAME_PATH = "M12 2c1 3-2 4.5-2 7a3 3 0 0 0 6 0c0-1-.3-1.8-.7-2.4C17 8 18 10.3 18 13a6 6 0 1 1-12 0c0-4.5 3.5-6.5 6-11z";
+
+  function flameEl(count, big) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", FLAME_PATH);
+    svg.appendChild(path);
+    return UI.el("span", { class: "flame" + (big ? " big" : "") }, [svg, UI.el("b", { text: String(count) })]);
+  }
+
+  // A single-value SVG ring — used only for "progress toward this rung's
+  // gate", the one place in the app a radial has a single 0-100% meaning.
+  // The full ladder (ten-plus rungs) stays linear bars on Progress; a page
+  // of rings there would be decoration, not information.
+  function ringEl(pct, size) {
+    size = size || 64;
+    const r = (size - 8) / 2, c = 2 * Math.PI * r;
+    const clamped = Math.max(0, Math.min(1, pct));
+    const wrap = UI.el("div", { class: "ring", style: "width:" + size + "px;height:" + size + "px" });
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+    svg.setAttribute("width", size); svg.setAttribute("height", size);
+    [["track", 0], ["fill", c * (1 - clamped)]].forEach(([cls, offset]) => {
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("class", cls);
+      circle.setAttribute("cx", size / 2); circle.setAttribute("cy", size / 2); circle.setAttribute("r", r);
+      if (cls === "fill") {
+        circle.setAttribute("stroke-dasharray", c);
+        circle.setAttribute("stroke-dashoffset", offset);
+      }
+      svg.appendChild(circle);
+    });
+    wrap.appendChild(svg);
+    wrap.appendChild(UI.el("div", { class: "num mono", text: Math.round(clamped * 100) + "%" }));
+    return wrap;
+  }
+
+  function chip(label, valueEl, opts) {
+    const dd = typeof valueEl === "string" ? UI.el("dd", { class: "big", text: valueEl }) : valueEl;
+    return UI.el("div", { class: "chip" + (opts && opts.accent ? " accent" : "") }, [
+      UI.el("dt", { text: label }), dd
+    ]);
+  }
+
+  function updateHeaderStreak() {
+    const el = document.getElementById("headerStreak");
+    if (!el) return;
+    el.textContent = "";
+    el.appendChild(flameEl(state().streak.current));
+  }
+
   /* --- Home ---------------------------------------------------------------- */
 
   function viewHome() {
@@ -68,13 +120,11 @@
     const homeGrid = UI.el("div", { class: "home" });
 
     const lead = UI.el("div", { class: "lead" });
-    lead.appendChild(UI.el("div", { class: "due mono", text: String(dueCloze + dueRecall) }));
-    lead.appendChild(UI.el("p", { class: "duelab" }, [
-      "cards due today · ",
-      UI.el("span", { class: "mono", text: String(s.streak.current) }),
-      "-day streak ",
-      UI.el("span", { class: "dot" })
+    lead.appendChild(UI.el("div", { class: "duerow" }, [
+      UI.el("div", { class: "due mono", text: String(dueCloze + dueRecall) }),
+      flameEl(s.streak.current, true)
     ]));
+    lead.appendChild(UI.el("p", { class: "duelab", text: "cards due today" }));
 
     const launch = UI.el("div", { class: "launch" });
     const launchers = [
@@ -88,11 +138,7 @@
           UI.el("div", { class: "nm", text: name }),
           UI.el("div", { class: "ds", text: desc })
         ]),
-        UI.el("div", {}, [
-          UI.el("span", { class: "ct mono", text: String(count) }),
-          " ",
-          UI.el("span", { class: "arrow", text: "→" })
-        ])
+        UI.el("span", { class: "ct mono", text: String(count) })
       ]);
       launch.appendChild(btn);
     });
@@ -101,7 +147,7 @@
         UI.el("div", { class: "nm", text: "Gate · " + cur.rungId }),
         UI.el("div", { class: "ds", text: cur.seen + "/" + cur.need + " questions at " + fmtPct(cur.right / (cur.seen || 1)) + " — needs " + Math.round(cur.threshold * 100) + "%" })
       ]),
-      UI.el("span", { class: "arrow", text: "→" })
+      ringEl(cur.seen ? cur.seen / cur.need : 0, 44)
     ]);
     launch.appendChild(gateBtn);
     lead.appendChild(launch);
@@ -143,12 +189,14 @@
           "/day over ", UI.el("span", { class: "mono", text: String(days) }), " days."])
       ]);
     }
-    const droppedStat = UI.el("div", { class: "stat", style: "border-bottom:0" }, [
+    const droppedStat = UI.el("div", { class: "stat" }, [
       UI.el("div", { class: "n", text: String(DATA_META.dropped_no_citation || 0) }),
       UI.el("div", { class: "l", text: "AWL words dropped, no citation" }),
       UI.el("div", { class: "sub", text: "Of " + DATA_META.awl_total + " AWL families — Wiktionary carries no usable quotation for the rest, so they do not ship." })
     ]);
-    [heldStat, rungStat, etaEl, droppedStat].forEach((n) => side.appendChild(n));
+    const statgrid = UI.el("div", { class: "statgrid" });
+    [heldStat, rungStat, etaEl, droppedStat].forEach((n) => statgrid.appendChild(n));
+    side.appendChild(statgrid);
     homeGrid.appendChild(side);
     app.appendChild(homeGrid);
     root.appendChild(app);
@@ -288,7 +336,7 @@
       const correct = !!o && o.id === w.id;
       Array.from(opts.children).forEach((el, j) => {
         el.disabled = true;
-        if (shuffled[j].id === w.id) el.classList.add("correct");
+        if (shuffled[j].id === w.id) { el.classList.add("correct"); if (correct) el.classList.add("pop"); }
         else if (el === btn) el.classList.add("wrong");
         else el.classList.add("dim");
       });
@@ -318,13 +366,19 @@
     const rail = UI.el("div", { class: "rail" });
     const cur = Rung.progress();
     const c = SRS.card(id);
-    const dl = UI.el("dl");
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Due" }), UI.el("dd", { class: "big", text: String(SRS.dueCount(clozeIds)) })]));
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "This card" }), UI.el("dd", {}, ["seen ", UI.el("span", { class: "mono", text: c.reps + "×" })])]));
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Rung" }), UI.el("dd", {}, [cur.rungId, UI.el("br"), UI.el("span", { style: "color:var(--mute);font-size:13px", text: "gate at " + Math.round(cur.threshold * 100) + "%" })])]));
+    rail.appendChild(chip("Due", String(SRS.dueCount(clozeIds))));
+    rail.appendChild(chip("This card", UI.el("dd", {}, ["seen ", UI.el("span", { class: "mono", text: c.reps + "×" })])));
+    const rungChip = UI.el("div", { class: "chip accent", style: "display:flex;align-items:center;gap:12px" }, [
+      ringEl(cur.seen ? cur.seen / cur.need : 0, 48),
+      UI.el("div", {}, [
+        UI.el("dt", { text: "Rung" }),
+        UI.el("dd", { text: cur.rungId }),
+        UI.el("div", { style: "font-size:11.5px;color:var(--mute);margin-top:2px", text: "gate at " + Math.round(cur.threshold * 100) + "%" })
+      ])
+    ]);
+    rail.appendChild(rungChip);
     const timingDD = UI.el("dd", { style: "color:var(--mute)", text: timed ? TIME_LIMIT + "s" : "untimed" });
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Timing" }), timingDD]));
-    rail.appendChild(dl);
+    rail.appendChild(chip("Timing", timingDD));
     drill.appendChild(rail);
 
     if (timed) {
@@ -400,6 +454,7 @@
       if (correct) {
         helper.appendChild(UI.el("b", { style: "color:var(--ok)", text: w.word }));
         helper.appendChild(document.createTextNode(" — correct."));
+        typed.classList.add("pop");
       } else {
         helper.appendChild(document.createTextNode("The word is "));
         helper.appendChild(UI.el("b", { text: w.word }));
@@ -417,10 +472,11 @@
 
     const rail = UI.el("div", { class: "rail" });
     const cz = SRS.accuracy("cloze"), rc = SRS.accuracy("recall");
-    const dl = UI.el("dl");
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Recall accuracy" }), UI.el("dd", { class: "big", text: fmtPct(rc.pct) }), UI.el("dd", { style: "color:var(--mute);font-size:12.5px", text: "over " + rc.seen + " answers" })]));
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Cloze accuracy" }), UI.el("dd", { class: "big", style: "color:var(--mute)", text: fmtPct(cz.pct) })]));
-    rail.appendChild(dl);
+    rail.appendChild(chip("Recall accuracy", UI.el("dd", {}, [
+      UI.el("span", { class: "big", style: "display:block", text: fmtPct(rc.pct) }),
+      UI.el("span", { style: "color:var(--mute);font-size:12.5px", text: "over " + rc.seen + " answers" })
+    ])));
+    rail.appendChild(chip("Cloze accuracy", UI.el("dd", { class: "big", style: "color:var(--mute)", text: fmtPct(cz.pct) })));
     drill.appendChild(rail);
     app.appendChild(drill);
     root.appendChild(app);
@@ -457,13 +513,13 @@
         tagChip(o.tags)
       ]);
       btn.addEventListener("click", () => {
+        const correct = o.ok;
         Array.from(opts.children).forEach((el, j) => {
           el.disabled = true;
-          if (options[j].ok) el.classList.add("correct");
+          if (options[j].ok) { el.classList.add("correct"); if (correct) el.classList.add("pop"); }
           else if (el === btn) el.classList.add("wrong");
           else el.classList.add("dim");
         });
-        const correct = o.ok;
         // Only cloze drives the gate — see the note in the recall drill.
         const cardId = "register:" + c.synset;
         SRS.grade(cardId, correct, "register");
@@ -486,11 +542,9 @@
     drill.appendChild(stage);
 
     const rail = UI.el("div", { class: "rail" });
-    const dl = UI.el("dl");
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Clusters" }), UI.el("dd", { class: "big", text: String(CLUSTERS.length) })]));
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Guard" }), UI.el("dd", { style: "font-size:13.5px", text: "At least one marked candidate and three unmarked, or the question is not generated." })]));
-    dl.appendChild(UI.el("div", {}, [UI.el("dt", { text: "Axis" }), UI.el("dd", { style: "font-size:13.5px" }, ["neutral vs. marked", UI.el("br"), UI.el("span", { style: "color:var(--mute)", text: "not formal vs. informal" })])]));
-    rail.appendChild(dl);
+    rail.appendChild(chip("Clusters", String(CLUSTERS.length)));
+    rail.appendChild(chip("Guard", UI.el("dd", { style: "font-size:13.5px", text: "At least one marked candidate and three unmarked, or the question is not generated." })));
+    rail.appendChild(chip("Axis", UI.el("dd", { style: "font-size:13.5px" }, ["neutral vs. marked", UI.el("br"), UI.el("span", { style: "color:var(--mute)", text: "not formal vs. informal" })])));
     drill.appendChild(rail);
     app.appendChild(drill);
     root.appendChild(app);
@@ -527,7 +581,7 @@
     const grid = UI.el("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:44px" });
 
     const accCol = UI.el("div");
-    accCol.appendChild(UI.el("div", { style: "margin-bottom:16px;font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--mute)", text: "Accuracy by drill" }));
+    accCol.appendChild(UI.el("div", { style: "margin-bottom:16px;font-size:14px;font-weight:600;color:var(--ink)", text: "Accuracy by drill" }));
     const bars1 = UI.el("div", { class: "bars" });
     const drillLabels = { cloze: "Cloze", recall: "Recall", register: "Register", cloze_timed: "Exam mode" };
     Object.keys(drillLabels).forEach((kind) => {
@@ -544,7 +598,7 @@
     grid.appendChild(accCol);
 
     const rungCol = UI.el("div");
-    rungCol.appendChild(UI.el("div", { style: "margin-bottom:16px;font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--mute)", text: "Ladder" }));
+    rungCol.appendChild(UI.el("div", { style: "margin-bottom:16px;font-size:14px;font-weight:600;color:var(--ink)", text: "Ladder" }));
     const bars2 = UI.el("div", { class: "bars" });
     const s = state();
     Rung.list().forEach((r, i) => {
@@ -722,4 +776,9 @@
   Router.register("progress", "Progress", viewProgress);
   Router.register("capture", "Capture", viewCapture);
   Router.register("settings", "Settings", viewSettings);
+
+  // The streak flame lives in the header, outside any one view's render, so
+  // it has to refresh on every navigation rather than once at load.
+  const _show = Router.show;
+  Router.show = function () { _show(); updateHeaderStreak(); };
 })();

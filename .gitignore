@@ -5,9 +5,10 @@ build/sources/*
 !build/sources/awl.json
 !build/sources/roots.json
 
-# Timestamped backups taken before large edits to fowler.html — local safety
-# net, not history. Git is the history once this is a repo.
+# Timestamped backups taken before large edits to fowler.html/views.js —
+# local safety net, not history. Git is the history once this is a repo.
 fowler.backup-*.html
+views.backup-*.js
 
 build/.venv/
 __pycache__/
