@@ -37,10 +37,28 @@ self.addEventListener("activate", function (e) {
     caches.keys()
       .then(function (keys) {
         return Promise.all(keys.map(function (k) {
-          return k === CACHE_NAME ? null : caches.delete(k);
+          return k === CACHE_NAME ? false : caches.delete(k);
         }));
       })
-      .then(function () { return self.clients.claim(); })
+      .then(function (deleted) {
+        // Deleting something means this is an upgrade over a previous version.
+        // A first install deletes nothing, and the page that triggered it is
+        // already showing the current app — reloading it would be noise.
+        const upgraded = deleted.indexOf(true) !== -1;
+        return self.clients.claim().then(function () {
+          if (!upgraded) return;
+          // Cache-first serves a page its response before this worker takes
+          // over, so without this an open tab shows the old app until its
+          // second reload. Reloading costs at most the question on screen:
+          // every graded answer is written to localStorage as it is graded.
+          // Deliberately not returned into waitUntil: navigate() settles only
+          // once the new page has loaded, and that load waits on this worker
+          // finishing activation. Awaiting it here deadlocks the activation.
+          self.clients.matchAll({ type: "window" }).then(function (cs) {
+            cs.forEach(function (c) { c.navigate(c.url).catch(function () {}); });
+          });
+        });
+      })
   );
 });
 
