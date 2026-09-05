@@ -8,7 +8,13 @@
  * admits it is offline.
  */
 
-const CACHE_NAME = "fowler-v1";
+// Bump this on every deploy that changes fowler.html or views.js. The fetch
+// handler below is cache-first and `activate` only deletes caches whose key
+// differs from this one — so if the name does not change, a browser that has
+// visited once keeps serving the old app forever. The bump is the whole
+// update mechanism: changing this file's bytes is what makes the browser
+// fetch a new worker at all.
+const CACHE_NAME = "fowler-v2";
 const SHELL = [
   "./",
   "index.html",
